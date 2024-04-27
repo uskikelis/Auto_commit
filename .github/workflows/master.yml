@@ -1,0 +1,62 @@
+name: Update Timestamp
+
+on:
+  push:
+    branches: [main]
+
+  schedule:
+    - cron: '0 */1 * * *'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update_commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Setup Debug Information
+        run: echo "::debug::Triggered by ref = ${{github.ref}}"
+
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - name: Update Timestamp File
+        run: |
+          current_time=$(date '+%Y-%m-%d %H:%M:%S')
+          echo "Updated on $current_time" > TIMESTAMP.txt
+
+      - name: Setup Git Configuration
+        run: |
+          git config user.email "uskikelis@gmail.com"
+          git config user.name "uskikelis"
+
+      - name: Commit changes
+        run: |
+          git add TIMESTAMP.txt
+          git commit -m "Update timestamp - $current_time"
+
+      - name: Fetch latest changes from origin
+        run: git fetch origin main
+
+      - name: Merge changes from origin/main
+        run: git merge origin/main --no-edit || echo "Conflict"
+
+      - name: Resolve merge conflicts
+        if: ${{ success() }}
+        run: |
+          git checkout --ours TIMESTAMP.txt
+          git add TIMESTAMP.txt
+          git commit -m "Resolve merge conflict by keeping local changes" || echo "No conflict to resolve"
+
+      - name: GitHub Push
+        uses: ad-m/github-push-action@v0.6.0
+        with:
+          directory: '.'
+          branch: main
+          github_token: ${{ secrets.GITHUB_TOKEN }}
